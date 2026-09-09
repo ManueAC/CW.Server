@@ -7,9 +7,6 @@ using System.Text.Json.Nodes;
 
 namespace CW.Server.Services;
 
-
-
-
 public sealed class MasteringService
 {
     private readonly ICustomizationRepository _customization;
@@ -74,14 +71,12 @@ public sealed class MasteringService
             var source = weapon.Value as JsonObject ?? new JsonObject();
 
             var exp = Json.ToInt(source["exp"]);
-
             if (exp != 0)
             {
                 target["exp"] = exp;
             }
 
             var totalExp = Json.ToInt(source["total_exp"]);
-
             if (totalExp != 0)
             {
                 target["total_exp"] = totalExp;
