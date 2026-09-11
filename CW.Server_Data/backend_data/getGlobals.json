@@ -40,7 +40,7 @@
   "g_vipassistexp": 150,
   "g_VIPRequiredPlayers": 4,
   "g_matchMaxTime": 10800,
-  "contractsTimer": 24,
+  "contractsTimer": 2400,
   "g_allowDMSpectate": false,
   "g_chatRepaRequired": 0,
   "g_capturexp": 100,
@@ -109,7 +109,7 @@
   "skillResetPrice": 1,
   "skillResetPriceCR": 1000,
   "undestructibleModCoef": 0.005,
-  "weaponSetPrices": [0, 5, 25, 50, 50],
+  "weaponSetPrices": [0, 10, 25, 50, 50],
   "unlockSetPrices": [0, 100, 300, 600, 1000, 1500],
   "expTable": [
     0, 200, 600, 1400, 2600, 4200, 6200, 8600, 11400, 14600, 18200, 22200,
