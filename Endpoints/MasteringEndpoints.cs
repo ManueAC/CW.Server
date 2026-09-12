@@ -76,6 +76,8 @@ public sealed class MasteringEndpoints
             return Reply.Ok();
         }
 
+        var playerId = _players.Caller(request);
+
         foreach (var account in payload)
         {
             if (account.Value is not JsonObject stats || !int.TryParse(account.Key, out var userId) || userId <= 0)
@@ -109,8 +111,62 @@ public sealed class MasteringEndpoints
 
             if (touched.Count > 0)
             {
+                _logger.LogInformation("================== MASTERING SAVE ================");
                 _logger.LogInformation("mastering saved uid{UserId}: {Stats}", userId, string.Join(", ", touched));
             }
+            // ============ TEMP
+            // var unlockedSets = _players.Data(userId)?["unlockedSets"]?.AsArray();
+            // var unlockedBlockIndices = unlockedSets?
+            //     .Select((value, index) => new { Value = value.GetValue<int>(), Index = index })
+            //     .Where(x => x.Value == 1)
+            //     .Select(x => x.Index)
+            //     .ToList();
+
+            // // Filtrar armas por block y excluir las que están en weaponExceptions
+            // var allWeapons = _data.Backend("getWeaponsEn").Arr("weapons");
+            // var filteredWeapons = allWeapons
+            //             .Where(weapon =>
+            //             {
+            //                 var block = weapon["block"].GetValue<int>();
+            //                 var type = weapon["type"].GetValue<string>();
+
+            //                 // Debe estar en un bloque desbloqueado Y NO estar en la lista de excepciones
+            //                 return unlockedBlockIndices.Contains(block) /* && !weaponExceptions.Contains(type) */;
+            //             })
+            //             .ToArray();
+            // var premiumWeaponsWithIndex = filteredWeapons
+            //      .Select((weapon, index) => new { Weapon = weapon, Index = index })
+            //      .Where(x =>
+            //      {
+            //          // Verificar que el campo "isPremium" exista y sea true
+            //          var isPremiumField = x.Weapon["isPremium"];
+            //          return isPremiumField != null && isPremiumField.GetValue<bool>() == true;
+            //      })
+            //      .ToList();
+            // if (premiumWeaponsWithIndex.Count > 0)
+            // {
+            //     // 2. Seleccionar un arma aleatoria de la lista de premium
+            //     var randomIndex = Random.Shared.Next(0, premiumWeaponsWithIndex.Count);
+            //     var selectedWeapon = premiumWeaponsWithIndex[randomIndex];
+
+            //     // 3. El ID será el índice de esta arma dentro del array filteredWeapons
+            //     int weaponId = selectedWeapon.Index;
+
+            //     // 4. Generar un descuento aleatorio (ejemplo: entre 10% y 90%)
+            //     // Puedes ajustar este rango según tus necesidades (ej. Random.Shared.Next(50, 90) para 50-89%)
+            //     int randomDiscount = Random.Shared.Next(65, 90);
+
+            //     // 5. Actualizar el perfil del USUARIO (no el -999) con el discount_id y el discount
+            //     _players.MutateData(userId, (userData) =>
+            //     {
+            //         userData["discount_id"] = weaponId;
+            //         userData["discount"] = randomDiscount;
+            //     });
+
+            //     _logger.LogInformation($"[GetAttempts] userId: {userId} Premium weapon assigned! ID: {weaponId}, Discount: {randomDiscount}%");
+            //     _logger.LogInformation("================== MASTERING SAVE END ================");
+
+            // }
         }
 
         return Reply.Ok();

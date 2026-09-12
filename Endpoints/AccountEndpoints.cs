@@ -105,67 +105,6 @@ public sealed class AccountEndpoints
 
         var profile = _profiles.Get(userId.Value);
 
-        var globals = _data.Backend("getGlobals");
-
-        // Lista de armas que NO deben desbloquearse (excepciones)
-        var weaponExceptions = new List<string> { "tkpd1", "tkpds", "ksg" };
-
-        // Obtener índices desbloqueados
-        var unlockedSets = _players.Data(userId.Value)?["unlockedSets"]?.AsArray();
-        var unlockedBlockIndices = unlockedSets?
-            .Select((value, index) => new { Value = value.GetValue<int>(), Index = index })
-            .Where(x => x.Value == 1)
-            .Select(x => x.Index)
-            .ToList();
-
-        // Filtrar armas por block y excluir las que están en weaponExceptions
-        var allWeapons = _data.Backend("getWeaponsEn").Arr("weapons");
-        var filteredWeapons = allWeapons
-            .Where(weapon =>
-            {
-                var block = weapon["block"].GetValue<int>();
-                var type = weapon["type"].GetValue<string>();
-
-                // Debe estar en un bloque desbloqueado Y NO estar en la lista de excepciones
-                return unlockedBlockIndices.Contains(block) && !weaponExceptions.Contains(type);
-            })
-            .ToArray();
-
-        _logger.LogInformation($"[GetAttempts] userId: {userId} unlockedBlocks: [{string.Join(",", unlockedBlockIndices)}], filteredWeapons count: {filteredWeapons.Length} (excluidas: {weaponExceptions.Count})");
-
-        var premiumWeaponsWithIndex = filteredWeapons
-     .Select((weapon, index) => new { Weapon = weapon, Index = index })
-     .Where(x =>
-     {
-         // Verificar que el campo "isPremium" exista y sea true
-         var isPremiumField = x.Weapon["isPremium"];
-         return isPremiumField != null && isPremiumField.GetValue<bool>() == true;
-     })
-     .ToList();
-
-        if (premiumWeaponsWithIndex.Count > 0)
-        {
-            // 2. Seleccionar un arma aleatoria de la lista de premium
-            var randomIndex = Random.Shared.Next(0, premiumWeaponsWithIndex.Count);
-            var selectedWeapon = premiumWeaponsWithIndex[randomIndex];
-
-            // 3. El ID será el índice de esta arma dentro del array filteredWeapons
-            int weaponId = selectedWeapon.Index;
-
-            // 4. Generar un descuento aleatorio (ejemplo: entre 10% y 90%)
-            // Puedes ajustar este rango según tus necesidades (ej. Random.Shared.Next(50, 90) para 50-89%)
-            int randomDiscount = Random.Shared.Next(65, 90);
-
-            // 5. Actualizar el perfil del USUARIO (no el -999) con el discount_id y el discount
-            _players.MutateData(userId.Value, (userData) =>
-            {
-                userData["discount_id"] = weaponId;
-                userData["discount"] = randomDiscount;
-            });
-
-            _logger.LogInformation($"[GetAttempts] userId: {userId} Premium weapon assigned! ID: {weaponId}, Discount: {randomDiscount}%");
-        }
-
         return _options.UnlockAll
             ? ProfileFactory.ApplyUnlockAll(Json.CloneObject(profile))
             : profile;
@@ -309,109 +248,103 @@ public sealed class AccountEndpoints
 
         var globals = _data.Backend("getGlobals");
 
-        //     // Lista de armas que NO deben desbloquearse (excepciones)
-        //     var weaponExceptions = new List<string> { "tkpd1", "tkpds", "ksg" };
+        // Lista de armas que NO deben desbloquearse (excepciones)
+        var weaponExceptions = new List<string> { };
 
-        //     // Obtener índices desbloqueados
-        //     var unlockedSets = _players.Data(userId)["unlockedSets"].AsArray();
-        //     var unlockedBlockIndices = unlockedSets
-        //         .Select((value, index) => new { Value = value.GetValue<int>(), Index = index })
-        //         .Where(x => x.Value == 1)
-        //         .Select(x => x.Index)
-        //         .ToList();
+        // Obtener índices desbloqueados
+        var unlockedSets = _players.Data(userId)?["unlockedSets"]?.AsArray();
+        var unlockedBlockIndices = unlockedSets?
+            .Select((value, index) => new { Value = value.GetValue<int>(), Index = index })
+            .Where(x => x.Value == 1)
+            .Select(x => x.Index)
+            .ToList();
 
-        //     // Filtrar armas por block y excluir las que están en weaponExceptions
-        //     var allWeapons = _data.Backend("getWeaponsEn").Arr("weapons");
-        //     var filteredWeapons = allWeapons
-        //         .Where(weapon =>
-        //         {
-        //             var block = weapon["block"].GetValue<int>();
-        //             var type = weapon["type"].GetValue<string>();
+        // Filtrar armas por block y excluir las que están en weaponExceptions
+        var allWeapons = _data.Backend("getWeaponsEn").Arr("weapons");
+        var filteredWeaponsALT = allWeapons
+            .Where(weapon =>
+            {
+                var block = weapon["block"].GetValue<int>();
+                var type = weapon["type"].GetValue<string>();
+                var isGold = weapon["isPremium"];
 
-        //             // Debe estar en un bloque desbloqueado Y NO estar en la lista de excepciones
-        //             return unlockedBlockIndices.Contains(block) && !weaponExceptions.Contains(type);
-        //         })
-        //         .ToArray();
+                // Debe estar en un bloque desbloqueado Y NO estar en la lista de excepciones
+                return unlockedBlockIndices.Contains(block) && !weaponExceptions.Contains(type) && isGold != null && isGold.GetValue<bool>() == true;
 
-        //     _logger.LogInformation($"[GetAttempts] userId: {userId} unlockedBlocks: [{string.Join(",", unlockedBlockIndices)}], filteredWeapons count: {filteredWeapons.Length} (excluidas: {weaponExceptions.Count})");
+            }).ToList();
 
-        //     // ========================================================================
-        //     // NUEVA LÓGICA: Seleccionar arma premium aleatoria y aplicar descuento
-        //     // ========================================================================
+        // var weaponNames = string.Join(", ", filteredWeaponsALT.Select(w => w["type"]?.GetValue<string>() ?? "Unknown"));
 
-        //     // var premiumWeaponsWithIndex = filteredWeapons
-        //     //     .Select((weapon, index) => new { Weapon = weapon, Index = index })
-        //     //     .Where(x => x.Weapon["isPremium"]?.GetValue<bool>() == true) // Usamos '?' porque isPremium es opcional en el JSON
-        //     //     .ToList();
-        //     // 1. Filtrar solo las armas premium y conservar su índice original en filteredWeapons
-        //     var premiumWeaponsWithIndex = filteredWeapons
-        //  .Select((weapon, index) => new { Weapon = weapon, Index = index })
-        //  .Where(x =>
-        //  {
-        //      // Verificar que el campo "isPremium" exista y sea true
-        //      var isPremiumField = x.Weapon["isPremium"];
-        //      return isPremiumField != null && isPremiumField.GetValue<bool>() == true;
-        //  })
-        //  .ToList();
+        var filteredWeapons = allWeapons
+            .Where(weapon =>
+            {
+                var block = weapon["block"].GetValue<int>();
+                var type = weapon["type"].GetValue<string>();
 
-        //     if (premiumWeaponsWithIndex.Count > 0)
-        //     {
-        //         // 2. Seleccionar un arma aleatoria de la lista de premium
-        //         var randomIndex = Random.Shared.Next(0, premiumWeaponsWithIndex.Count);
-        //         var selectedWeapon = premiumWeaponsWithIndex[randomIndex];
+                // Debe estar en un bloque desbloqueado Y NO estar en la lista de excepciones
+                return unlockedBlockIndices.Contains(block) && !weaponExceptions.Contains(type);
+            })
+            .ToArray();
 
-        //         // 3. El ID será el índice de esta arma dentro del array filteredWeapons
-        //         int weaponId = selectedWeapon.Index;
+        var premiumWeaponsWithIndex = filteredWeaponsALT
+     .Select((weapon, index) => new { Weapon = weapon, Index = index })
+     .Where(x =>
+     {
+         var isPremiumField = x.Weapon["isPremium"];
+         return isPremiumField != null && isPremiumField.GetValue<bool>() == true;
+     })
+     .ToList();
 
-        //         // 4. Generar un descuento aleatorio (ejemplo: entre 10% y 90%)
-        //         // Puedes ajustar este rango según tus necesidades (ej. Random.Shared.Next(50, 90) para 50-89%)
-        //         int randomDiscount = Random.Shared.Next(65, 90);
+        var premiumWeaponsWithIndexWeaponNames = string.Join(", ", premiumWeaponsWithIndex.Select(w => w.Weapon["type"]?.GetValue<string>() ?? "Unknown"));
 
-        //         // 5. Actualizar el perfil del USUARIO (no el -999) con el discount_id y el discount
-        //         _players.MutateData(userId, (userData) =>
-        //         {
-        //             userData["discount_id"] = weaponId;
-        //             userData["discount"] = randomDiscount;
-        //         });
+        long now = _clock.UnixSeconds;
+        // long cooldownSeconds = 3 * 60 * 60; // 10,800 seconds
+        long cooldownSeconds = 1 * 60 * 60; // 3600 seconds hour
+        // long cooldownSeconds = 5 * 60; // 300 seconds
 
-        //         // var remaining = Math.Max(0,  - 1);
+        if (premiumWeaponsWithIndex.Count > 0)
+        {
+            var random = new Random();
+            var randomItem = premiumWeaponsWithIndex[random.Next(premiumWeaponsWithIndex.Count)];
 
+            // 3. Extract the "type" and the "Index" safely
+            string randomWeaponType = randomItem.Weapon["type"]?.GetValue<string>() ?? "unknown_type";
+            int randomWeaponIndex = randomItem.Index;
+            int randomDiscount = Random.Shared.Next(65, 90);
 
-        //         _logger.LogInformation($"[GetAttempts] userId: {userId} Premium weapon assigned! ID: {weaponId}, Discount: {randomDiscount}%");
-        //     }
-        // ========================================================================
+            // 5. Actualizar el perfil del USUARIO (no el -999) con el discount_id y el discount
+            _players.MutateData(userId, (userData) =>
+            {
+                // 2. Safely get the last discount timestamp (defaults to 0 if it doesn't exist yet)
+                var lastDiscountNode = userData["latestDiscount"];
+                long lastDiscount = lastDiscountNode != null ? lastDiscountNode.GetValue<long>() : 0;
 
+                // 3. Check if it's the first time EVER (lastDiscount == 0) OR if 3 hours have passed
+                if (lastDiscount == 0 || (now - lastDiscount) >= cooldownSeconds)
+                {
+                    // Update the discount data
+                    userData["discount_id"] = randomWeaponIndex;
+                    userData["discount"] = randomDiscount;
+                    userData["latestDiscount"] = now;
 
-        // Actualizar profile -999.json con las armas desbloqueadas
-        // _players.MutateData(-999, (data) =>
-        // {
-        //     var weaponsArray = new JsonArray();
+                    var dailyRouletteCount = globals["roulette"]?["dailyCount"]?.GetValue<int>() ?? 0;
+                    // _logger.LogInformation($"[GetAttempts] userId: {userId} Daily roulette attempts assigned!");
 
-        //     for (int i = 0; i < filteredWeapons.Length; i++)
-        //     {
-        //         var weapon = filteredWeapons[i];
-        //         var weaponType = weapon["type"].GetValue<string>();
+                    _attempts.Set(userId, dailyRouletteCount);
 
-        //         weaponsArray.Add(new JsonObject
-        //         {
-        //             ["unlocked"] = true,
-        //             ["wtaskCurrent"] = 0,
-        //             ["repair_info"] = 0,
-        //             ["rentEnd"] = -1,
-        //             // ["id"] = i,
-        //             ["wtaskMax"] = 150,
-        //             ["wtaskSelected"] = false
-        //             // ["type"] = weaponType // Si necesitas guardar el tipo también
-        //         });
-        //     }
+                    _logger.LogInformation($"[Discount] Updated weapon discount for user {userId}. Next update in {cooldownSeconds / 60 / 60} hour/s.");
+                    // _logger.LogInformation($"[GetAttempts] userId: {userId} Premium weapon assigned! ID: {randomWeaponIndex}, Discount: {randomDiscount}%");
+                }
+                else
+                {
+                    // Optional: Log how much time is left until the next update
+                    long timeLeft = cooldownSeconds - (now - lastDiscount);
+                    _logger.LogInformation($"[Discount] Skipped update for user {userId}. Next update in {timeLeft / 60} minutes.");
+                }
+            });
 
-        //     data["weapons"] = weaponsArray;
-        // });
+        }
 
-        var dailyRouletteCount = globals["roulette"]?["dailyCount"]?.GetValue<int>() ?? 0;
-        _logger.LogInformation($"[GetAttempts] userId: {userId} Daily roulette attempts assigned!");
-
-        _attempts.Set(userId, dailyRouletteCount);
         return Reply.Ok(("attempts", _attempts.Get(userId, _catalog.DailyAttempts)));
     }
 

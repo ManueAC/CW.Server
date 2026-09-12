@@ -98,8 +98,33 @@ public sealed class EconomyEndpoints
             price = rentPrices[option];
             rentEnd = _clock.UnixSeconds + Math.Max(1, rentDays[option]) * 86400L;
         }
+        _logger.LogWarning($"[ Premium weapon unlock ] rentPrices: {rentPrices} req: {request.Body}, RawBody: {request.RawBody} BodyObject: {request.BodyObject}");
 
-        var purchase = _players.Charge(userId.Value, PlayerService.GamePoints, price, data =>
+        var playerData = _players.Data(userId.Value);
+        // Safely extract discount values as integers
+        var discountIdNode = playerData["discount_id"];
+        var discountAmountNode = playerData["discount"];
+
+        int currentDiscountId = discountIdNode != null ? discountIdNode.GetValue<int>() : 0;
+        int currentDiscountAmount = discountAmountNode != null ? discountAmountNode.GetValue<int>() : 0;
+
+        // Check if the discount specifically applies to this weapon
+        bool includeWeapDiscount = (index == currentDiscountId);
+
+        // Calculate final price
+        int finalPrice = price;
+        if (includeWeapDiscount && currentDiscountAmount > 0 && currentDiscountAmount <= 100)
+        {
+            // Apply discount percentage
+            finalPrice = (int)Math.Round(price * (1.0 - (currentDiscountAmount / 100.0)));
+
+            // Safety check: ensure price never drops below 0
+            if (finalPrice < 0) finalPrice = 0;
+        }
+        _logger.LogWarning($"[ Premium weapon unlock ] weapId: {index} / currentDiscountTo: {currentDiscountId} & amount {currentDiscountAmount} / include? {includeWeapDiscount} / prev price: {price} ~ new price: {finalPrice}");
+
+        // var purchase = _players.Charge(userId.Value, PlayerService.GamePoints, price, data =>
+        var purchase = _players.Charge(userId.Value, PlayerService.GamePoints, finalPrice, data =>
         {
             var weapon = PlayerService.WeaponAt(data, index);
             if (weapon is not null)
@@ -107,6 +132,8 @@ public sealed class EconomyEndpoints
                 weapon["unlocked"] = true;
                 weapon["repair_info"] = UndestructableSentinel;
                 weapon["rentEnd"] = rentEnd;
+
+                _logger.LogInformation($"weapon data: {weapon["InterfaceName"]} index: {index}");
             }
         });
 
